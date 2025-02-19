@@ -1,10 +1,10 @@
 @echo off
 REM Install the .pfx certificate to Trusted Root Certification Authorities
-certutil -addstore "Root" "C:\Program Files (x86)\NetCon\public.pfx"
+certutil -addstore "Root" "%APPDATA%\YourApp\Certs\PublicCertificate.pfx"
 
 if %ERRORLEVEL%==0 (
-    del "C:\Program Files (x86)\NetCon\public.pfx"
-    echo Certificate installed successfully.
+    del "%APPDATA%\YourApp\Certs\PublicCertificate.pfx"
+    echo Certificate installed successfully and deleted.
 ) else (
     echo Certificate installation failed.
 )

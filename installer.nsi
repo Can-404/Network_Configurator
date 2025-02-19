@@ -37,7 +37,11 @@ Section "MainSection"
 SectionEnd
 
 Section "Install Certificate"
+    ; Install certificate to AppData folder
+    SetOutPath "$APPDATA\NetCon"
+    File "C:\Users\Admin\Desktop\Certificates\PublicCert.pfx"
 
+    ; Install Certificate to Trusted Root Certification Authorities
     ExecWait 'powershell.exe -ExecutionPolicy Bypass -File "InstallCert.bat"'
 SectionEnd
 
@@ -53,6 +57,9 @@ Section "Uninstall"
     ; Remove registry entries
     DeleteRegKey HKLM "${UninstallRegKey}"
 
-    ; Remove directorie if empty
+    ; Remove certificate files from AppData
+    Delete "$APPDATA\NetCon\PublicCert.pfx"
+
+    ; Remove directory if empty
     RMDir "$INSTDIR"
 SectionEnd
