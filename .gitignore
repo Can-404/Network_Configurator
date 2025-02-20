@@ -1,2 +1,4 @@
 *.exe
 *.pfx
+*.cer
+Temp.txt

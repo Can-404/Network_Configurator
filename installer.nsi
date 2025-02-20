@@ -13,15 +13,22 @@ Icon "Icon.ico"
 
 ; Define installer pages
 !insertmacro MUI_PAGE_DIRECTORY
+!define MUI_LICENSEPAGE_CHECKBOX
+!insertmacro MUI_PAGE_LICENSE "LICENSE.txt"
 !insertmacro MUI_PAGE_INSTFILES
-!insertmacro MUI_UNPAGE_INSTFILES
+
+; Define uninstaller pages
 !insertmacro MUI_UNPAGE_CONFIRM
+!insertmacro MUI_UNPAGE_INSTFILES
 
 Section "MainSection"
     ; Install application files to Program Files
     SetOutPath "$INSTDIR"
     File "NetCon.exe"
+    File "README.md"
+    File "LICENSE.txt"
     File "Icon.ico"
+
     WriteUninstaller "$INSTDIR\Uninstall.exe"
 
     ; Create a desktop shortcut
@@ -37,17 +44,18 @@ Section "MainSection"
 SectionEnd
 
 Section "Install Certificate"
-    ; Install certificate to AppData folder
+    
     SetOutPath "$APPDATA\NetCon"
-    File "C:\Users\Admin\Desktop\Certificates\PublicCert.pfx"
-
-    ; Install Certificate to Trusted Root Certification Authorities
-    ExecWait 'powershell.exe -ExecutionPolicy Bypass -File "InstallCert.bat"'
+    File "PublicCert.cer"
+    ExecWait 'certutil -addstore "Root" "$APPDATA\NetCon\PublicCert.cer"'
+    Delete "$APPDATA\NetCon\PublicCert.cer"
 SectionEnd
 
 Section "Uninstall"
     ; Remove application files
     Delete "$INSTDIR\NetCon.exe"
+    Delete "$INSTDIR\README.md"
+    Delete "$INSTDIR\LICENSE.txt"
     Delete "$INSTDIR\Icon.ico"
     Delete "$INSTDIR\Uninstall.exe"
 
@@ -57,8 +65,22 @@ Section "Uninstall"
     ; Remove registry entries
     DeleteRegKey HKLM "${UninstallRegKey}"
 
+    ; Remove installed certificate
+    ExecWait 'certutil -delstore "Root" "NetCon-T5-Cert"'
+
     ; Remove certificate files from AppData
-    Delete "$APPDATA\NetCon\PublicCert.pfx"
+    Delete "$APPDATA\NetCon\PublicCert.cer"
+
+    ; Delete config Window
+    MessageBox MB_YESNO|MB_ICONQUESTION "Delete config files?" IDYES DeleteConfig
+
+    Goto SkipConfigDelete
+
+    DeleteConfig:
+        Delete "$APPDATA\NetCon\UserData.json"
+        RMDir "$APPDATA\NetCon"
+
+    SkipConfigDelete:
 
     ; Remove directory if empty
     RMDir "$INSTDIR"
