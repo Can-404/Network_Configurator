@@ -19,6 +19,19 @@
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
 
+# Define the default network adapter name
+$defaultAdapter = "Ethernet"
+
+# Create a named mutex so Only one instance of the application can run at a time
+$mutexName = "Global\NetConAppMutex"
+$createdNew = $false
+$mutex = New-Object System.Threading.Mutex($true, $mutexName, [ref]$createdNew)
+
+if (-not $createdNew) {
+    [System.Windows.Forms.MessageBox]::Show("NetCon is already running!", "Instance Detected", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Exclamation)
+    exit
+}
+
 # Define the JSON file path in %APPDATA%\NetCon\UserData.json
 $folderPath = [System.IO.Path]::Combine($env:APPDATA, "NetCon")
 $jsonPath = [System.IO.Path]::Combine($folderPath, "UserData.json")
@@ -71,6 +84,82 @@ if (Test-Path $jsonPath) {
     }
 }
 
+function New-Button {
+    param (
+        [string]$Text,
+        [System.Drawing.Point]$Location,
+        [int]$Width = 100,
+        [int]$Height = 30,
+        [scriptblock]$OnClick = $null,
+        [System.Drawing.Font]$Font = $null
+    )
+
+    $button = New-Object System.Windows.Forms.Button
+    $button.Text = $Text
+    $button.Location = $Location
+    $button.Width = $Width
+    $button.Height = $Height
+
+    if ($Font -eq "Segoe") {
+        $button.Font = New-Object System.Drawing.Font("Segoe UI Emoji", 12)
+    }
+
+    if ($OnClick) {
+        $button.Add_Click($OnClick)
+    }
+
+    # Add the Button to the form
+    $form.Controls.Add($button)
+
+    return $button
+}
+
+function New-Label {
+    param (
+        [string]$Text,
+        [System.Drawing.Point]$Location,
+        [int]$Width = 100,
+        [int]$Height = 20,
+        [System.Drawing.Font]$Font = $null
+    )
+
+    $label = New-Object System.Windows.Forms.Label
+    $label.Text = $Text
+    $label.Location = $Location
+    $label.Width = $Width
+    $label.Height = $Height
+
+    if ($Font) {
+        $label.Font = $Font
+    }
+
+    # Add the Label to the form
+    $form.Controls.Add($label)
+
+    return $label
+}
+
+function New-TextBox {
+    param(
+        [string]$textBoxText,  # The initial text inside the TextBox
+        [int]$x,               # X position
+        [int]$y,               # Y position
+        [int]$width            # Width of the TextBox
+    )
+
+    # Create a new TextBox object
+    $textBox = New-Object System.Windows.Forms.TextBox
+    $textBox.Text = $textBoxText
+    $textBox.Location = New-Object System.Drawing.Point($x, $y)
+    $textBox.Width = $width
+
+    # Add the TextBox to the form
+    $form.Controls.Add($textBox)
+
+    
+    return $textBox
+}
+
 # Create Form
 $form = New-Object System.Windows.Forms.Form
 $form.Text = "Network Configurator"
@@ -83,42 +172,25 @@ if (Test-Path $iconPath) {
 }
 
 # Labels and TextBoxes
-$labelIP = New-Object System.Windows.Forms.Label
-$labelIP.Text = "IP:"
-$labelIP.Location = New-Object System.Drawing.Point(30, 20)
+$labelIP = New-Label -Text "IP:" -Location (New-Object System.Drawing.Point(30, 20))
 $form.Controls.Add($labelIP)
 
-$textBoxIP = New-Object System.Windows.Forms.TextBox
-$textBoxIP.Location = New-Object System.Drawing.Point(150, 20)
-$textBoxIP.Width = 180
-$form.Controls.Add($textBoxIP)
-
-$labelGateway = New-Object System.Windows.Forms.Label
-$labelGateway.Text = "Gateway:"
-$labelGateway.Location = New-Object System.Drawing.Point(30, 60)
+$labelGateway = New-Label -Text "Gateway:" -Location (New-Object System.Drawing.Point(30, 60))
 $form.Controls.Add($labelGateway)
 
-$textBoxGateway = New-Object System.Windows.Forms.TextBox
-$textBoxGateway.Location = New-Object System.Drawing.Point(150, 60)
-$textBoxGateway.Width = 180
-$form.Controls.Add($textBoxGateway)
-
-$labelSubnet = New-Object System.Windows.Forms.Label
-$labelSubnet.Text = "Subnet mask:"
-$labelSubnet.Location = New-Object System.Drawing.Point(30, 100)
+$labelSubnet = New-Label -Text "Subnet mask:" -Location (New-Object System.Drawing.Point(30, 100))
 $form.Controls.Add($labelSubnet)
 
-# Create the TextBox control for Subnet Mask with placeholder
-$textBoxSubnet = New-Object System.Windows.Forms.TextBox
-$textBoxSubnet.Location = New-Object System.Drawing.Point(150, 100)
-$textBoxSubnet.Width = 180
-$form.Controls.Add($textBoxSubnet)
+$textBoxIP = New-TextBox -x 150 -y 20 -width 180
+$textBoxGateway = New-TextBox -x 150 -y 60 -width 180
+$textBoxSubnet = New-TextBox -x 150 -y 100 -width 180
+$textBoxDNS = New-TextBox -x 150 -y 140 -width 180
 
+# Event handler for when the Subnet Mask TextBox gets focus
 $placeholderSubnet = "255.255.255.0"
 $textBoxSubnet.Text = $placeholderSubnet
 $textBoxSubnet.ForeColor = [System.Drawing.Color]::Gray
 
-# Event handler for when the Subnet Mask TextBox gets focus
 $textBoxSubnet.Add_Enter({
     if ($textBoxSubnet.Text -eq $placeholderSubnet) {
         $textBoxSubnet.Text = ""
@@ -139,17 +211,14 @@ $labelDNS.Text = "DNS:"
 $labelDNS.Location = New-Object System.Drawing.Point(30, 140)
 $form.Controls.Add($labelDNS)
 
-# Create the TextBox control for DNS with placeholder
-$textBoxDNS = New-Object System.Windows.Forms.TextBox
-$textBoxDNS.Location = New-Object System.Drawing.Point(150, 140)
-$textBoxDNS.Width = 180
-$form.Controls.Add($textBoxDNS)
+$labelDNS = New-Label -Text "DNS:" -Location (New-Object System.Drawing.Point(30, 140))
+$form.Controls.Add($labelDNS)
 
+# Event handler for when the DNS TextBox gets focus
 $placeholderDNS = "8.8.8.8"
 $textBoxDNS.Text = $placeholderDNS
 $textBoxDNS.ForeColor = [System.Drawing.Color]::Gray
 
-# Event handler for when the DNS TextBox gets focus
 $textBoxDNS.Add_Enter({
     if ($textBoxDNS.Text -eq $placeholderDNS) {
         $textBoxDNS.Text = ""
@@ -166,88 +235,43 @@ $textBoxDNS.Add_Leave({
 })
 
 # Save Buttons for each Numbered Slot
-$saveButtonIP1 = New-Object System.Windows.Forms.Button
-$saveButtonIP1.Text = "1"
-$saveButtonIP1.Location = New-Object System.Drawing.Point(150, 180)
-$saveButtonIP1.Width = 40
-$saveButtonIP1.Height = 20
-$form.Controls.Add($saveButtonIP1)
-
-$saveButtonIP2 = New-Object System.Windows.Forms.Button
-$saveButtonIP2.Text = "2"
-$saveButtonIP2.Location = New-Object System.Drawing.Point(200, 180)
-$saveButtonIP2.Width = 40
-$saveButtonIP2.Height = 20
-$form.Controls.Add($saveButtonIP2)
-
-$saveButtonIP3 = New-Object System.Windows.Forms.Button
-$saveButtonIP3.Text = "3"
-$saveButtonIP3.Location = New-Object System.Drawing.Point(250, 180)
-$saveButtonIP3.Width = 40
-$saveButtonIP3.Height = 20
-$form.Controls.Add($saveButtonIP3)
-
-$saveButtonIP4 = New-Object System.Windows.Forms.Button
-$saveButtonIP4.Text = "4"
-$saveButtonIP4.Location = New-Object System.Drawing.Point(300, 180)
-$saveButtonIP4.Width = 40
-$saveButtonIP4.Height = 20
-$form.Controls.Add($saveButtonIP4)
+$saveButtonIP1 = New-Button -Text "1" -Location (New-Object System.Drawing.Point(150, 180)) -Width 40 -Height 20
+$saveButtonIP2 = New-Button -Text "2" -Location (New-Object System.Drawing.Point(200, 180)) -Width 40 -Height 20
+$saveButtonIP3 = New-Button -Text "3" -Location (New-Object System.Drawing.Point(250, 180)) -Width 40 -Height 20
+$saveButtonIP4 = New-Button -Text "4" -Location (New-Object System.Drawing.Point(300, 180)) -Width 40 -Height 20
 
 # Buttons to Change IP
-$buttonIP1 = New-Object System.Windows.Forms.Button
-$buttonIP1.Text = "Change to IP - 1"
-$buttonIP1.Location = New-Object System.Drawing.Point(30, 240)
-$buttonIP1.Width = 120
-$form.Controls.Add($buttonIP1)
-
-$buttonIP2 = New-Object System.Windows.Forms.Button
-$buttonIP2.Text = "Change to IP - 2"
-$buttonIP2.Location = New-Object System.Drawing.Point(210, 240)
-$buttonIP2.Width = 120
-$form.Controls.Add($buttonIP2)
-
-$buttonIP3 = New-Object System.Windows.Forms.Button
-$buttonIP3.Text = "Change to IP - 3"
-$buttonIP3.Location = New-Object System.Drawing.Point(30, 300)
-$buttonIP3.Width = 120
-$form.Controls.Add($buttonIP3)
-
-$buttonIP4 = New-Object System.Windows.Forms.Button
-$buttonIP4.Text = "Change to IP - 4"
-$buttonIP4.Location = New-Object System.Drawing.Point(210, 300)
-$buttonIP4.Width = 120
-$form.Controls.Add($buttonIP4)
+$buttonIP1 = New-Button -Text "Change to IP - 1" -Location (New-Object System.Drawing.Point(30, 240)) -Width 120
+$buttonIP2 = New-Button -Text "Change to IP - 2" -Location (New-Object System.Drawing.Point(210, 240)) -Width 120
+$buttonIP3 = New-Button -Text "Change to IP - 3" -Location (New-Object System.Drawing.Point(30, 300)) -Width 120
+$buttonIP4 = New-Button -Text "Change to IP - 4" -Location (New-Object System.Drawing.Point(210, 300)) -Width 120
 
 # Change IP Lable
-$labelIP1 = New-Object System.Windows.Forms.Label
-$labelIP1.Text = "192.168.10.72"
-$labelIP1.Location = New-Object System.Drawing.Point(30, 220)
+$labelIP1 = New-Label -Text "192.168.10.72" -Location (New-Object System.Drawing.Point(30, 220))
 $form.Controls.Add($labelIP1)
 
-$labelIP2 = New-Object System.Windows.Forms.Label
-$labelIP2.Text = "192.168.10.72"
-$labelIP2.Location = New-Object System.Drawing.Point(210, 220)
+$labelIP2 = New-Label -Text "192.168.10.72" -Location (New-Object System.Drawing.Point(210, 220))
 $form.Controls.Add($labelIP2)
 
-$labelIP3 = New-Object System.Windows.Forms.Label
-$labelIP3.Text = "192.168.10.72"
-$labelIP3.Location = New-Object System.Drawing.Point(30, 280)
+$labelIP3 = New-Label -Text "192.168.10.72" -Location (New-Object System.Drawing.Point(30, 280))
 $form.Controls.Add($labelIP3)
 
-$labelIP4 = New-Object System.Windows.Forms.Label
-$labelIP4.Text = "192.168.10.72"
-$labelIP4.Location = New-Object System.Drawing.Point(210, 280)
+$labelIP4 = New-Label -Text "192.168.10.72" -Location (New-Object System.Drawing.Point(210, 280))
 $form.Controls.Add($labelIP4)
 
-# Reset Button
-$resetButton = New-Object System.Windows.Forms.Button
+# Network Setting Buttons
+$networkButton = New-Button -Text "🌐" -Location (New-Object System.Drawing.Point(350, 18)) -Width 26 -Height 26
+$networkButton.Font = New-Object System.Drawing.Font("Segoe UI Emoji", 12)
+
+$resetButton = New-Button -Text "🔄" -Location (New-Object System.Drawing.Point(350, 58)) -Width 26 -Height 26
 $resetButton.Font = New-Object System.Drawing.Font("Segoe UI Emoji", 12)
-$resetButton.Text = "🔄"
-$resetButton.Location = New-Object System.Drawing.Point(350, 20)
-$resetButton.Width = 22
-$resetButton.height = 22
-$form.Controls.Add($resetButton)
+
+$uninstallButton = New-Button -Text "🗑️" -Location (New-Object System.Drawing.Point(350, 98)) -Width 26 -Height 26
+$uninstallButton.Font = New-Object System.Drawing.Font("Segoe UI Emoji", 12)
+
+$buttonDHCP = New-Button -Text "DHCP" -Location (New-Object System.Drawing.Point(30, 350)) -Width 120
+
+$ConfirmButtonIP = New-Button -Text "Confirm" -Location (New-Object System.Drawing.Point(210, 350)) -Width 120
 
 # ToolTip
 $tooltip = New-Object System.Windows.Forms.ToolTip
@@ -255,8 +279,10 @@ $tooltip.AutoPopDelay = 5000
 $tooltip.InitialDelay = 1000
 $tooltip.ReshowDelay = 500
 
-# Add a tooltip to Reset Button
+# Add a tooltip
+$tooltip.SetToolTip($networkButton, "Network Settings")
 $tooltip.SetToolTip($resetButton, "Reset Stored Config")
+$tooltip.SetToolTip($uninstallButton, "Uninstall NetCon")
 
 function Update-IPLabels {
     if ($existingData."1".IP -ne "0.0.0.0") {
@@ -312,63 +338,6 @@ function Approve-Input {
 
     return $true
 }
-Update-IPLabels
-
-# DHCP Button
-$buttonDHCP = New-Object System.Windows.Forms.Button
-$buttonDHCP.Text = "DHCP"
-$buttonDHCP.Location = New-Object System.Drawing.Point(30, 350)
-$buttonDHCP.Width = 120
-$form.Controls.Add($buttonDHCP)
-
-# Confirm Button
-$ConfirmButtonIP = New-Object System.Windows.Forms.Button
-$ConfirmButtonIP.Text = "Confirm"
-$ConfirmButtonIP.Location = New-Object System.Drawing.Point(210, 350)
-$ConfirmButtonIP.Width = 120
-$form.Controls.Add($ConfirmButtonIP)
-
-$defaultAdapter = "Ethernet"
-
-$ConfirmButtonIP.Add_Click({
-    $ip = $textBoxIP.Text
-    $gateway = $textBoxGateway.Text
-    $subnet = $textBoxSubnet.Text
-    $dns = $textBoxDNS.Text
-
-    if (-not (Approve-Input -ip $ip -subnet $subnet -gateway $gateway -dns $dns)) {
-        return 
-    }
-
-    Start-Process -FilePath "netsh" -ArgumentList "interface ip set address name=`"$defaultAdapter`" static $ip $subnet $gateway" -Verb RunAs
-    Start-Process -FilePath "netsh" -ArgumentList "interface ip set dns name=`"$defaultAdapter`" static $dns" -Verb RunAs
-
-    [System.Windows.Forms.MessageBox]::Show("Network settings updated!", "Success", "OK", "Information")
-})
-
-$buttonDHCP.Add_Click({
-    Start-Process -FilePath "netsh" -ArgumentList "interface ip set address name=`"$defaultAdapter`" source=dhcp" -Verb RunAs
-    Start-Process -FilePath "netsh" -ArgumentList "interface ip set dns name=`"$defaultAdapter`" source=dhcp" -Verb RunAs
-
-    [System.Windows.Forms.MessageBox]::Show("DHCP enabled!", "Success", "OK", "Information")
-})
-
-$resetButton.Add_Click({
-    $confirmation = [System.Windows.Forms.MessageBox]::Show("Are you sure you want to reset and delete the configuration?", "Confirm Reset", [System.Windows.Forms.MessageBoxButtons]::YesNo, [System.Windows.Forms.MessageBoxIcon]::Warning)
-
-    if ($confirmation -eq [System.Windows.Forms.DialogResult]::Yes) {
-        try {
-            # Delete the JSON file
-            Remove-Item -Path $jsonPath -Force
-            [System.Windows.Forms.MessageBox]::Show("Configuration was Reset Programm will now Restart.", "Success", "OK", "Information")
-
-            Restart-Executable
-        } catch {
-            [System.Windows.Forms.MessageBox]::Show("Error deleting configuration file.", "Error", "OK", "Error")
-        }
-    }
-})
-
 function Save-IPConfig($buttonNum) {
     $ip = $textBoxIP.Text.Trim()
     $subnet = $textBoxSubnet.Text.Trim()
@@ -410,11 +379,11 @@ function set-IPConfig($buttonNum) {
         $gateway = $config.Gateway
         $dns = $config.DNS
 
-        $adapterName = "Ethernet"
+        $defaultAdapter = "Ethernet"
 
         try {
-            Start-Process -FilePath "netsh" -ArgumentList "interface ip set address name=`"$adapterName`" static $ip $subnet $gateway"
-            Start-Process -FilePath "netsh" -ArgumentList "interface ip set dns name=`"$adapterName`" static $dns"
+            $netshCommand = "netsh interface ip set address name=`"$defaultAdapter`" static $ip $subnet $gateway && netsh interface ip set dns name=`"$defaultAdapter`" static $dns"
+            Start-Process -FilePath "cmd.exe" -ArgumentList "/c $netshCommand" -Verb RunAs -WindowStyle Hidden
             
             [System.Windows.Forms.MessageBox]::Show("Network settings updated!", "Success", "OK", "Information")
         } catch {
@@ -435,6 +404,66 @@ function Restart-Executable {
     Start-Process $exePath
 }
 
+$ConfirmButtonIP.Add_Click({
+    $ip = $textBoxIP.Text
+    $gateway = $textBoxGateway.Text
+    $subnet = $textBoxSubnet.Text
+    $dns = $textBoxDNS.Text
+
+    if (-not (Approve-Input -ip $ip -subnet $subnet -gateway $gateway -dns $dns)) {
+        return 
+    }
+
+    $netshCommand = "netsh interface ip set address name=`"$defaultAdapter`" static $ip $subnet $gateway && netsh interface ip set dns name=`"$defaultAdapter`" static $dns"
+    Start-Process -FilePath "cmd.exe" -ArgumentList "/c $netshCommand" -Verb RunAs -WindowStyle Hidden
+
+    [System.Windows.Forms.MessageBox]::Show("Network settings updated!", "Success", "OK", "Information")
+})
+
+$buttonDHCP.Add_Click({
+    $netshCommand = "netsh interface ip set address name=`"$defaultAdapter`" source=dhcp && netsh interface ip set dns name=`"$defaultAdapter`" source=dhcp"
+    Start-Process -FilePath "cmd.exe" -ArgumentList "/c $netshCommand" -Verb RunAs -WindowStyle Hidden
+
+    [System.Windows.Forms.MessageBox]::Show("DHCP enabled!", "Success", "OK", "Information")
+})
+
+$networkButton.Add_Click({
+    try {
+        Start-Process -FilePath "ncpa.cpl"
+    } catch {
+        [System.Windows.Forms.MessageBox]::Show("Error opening Network Connections.", "Error", "OK", "Error")
+    }
+})
+
+$resetButton.Add_Click({
+    $confirmation = [System.Windows.Forms.MessageBox]::Show("Are you sure you want to reset and delete the configuration?", "Confirm Reset", [System.Windows.Forms.MessageBoxButtons]::YesNo, [System.Windows.Forms.MessageBoxIcon]::Warning)
+
+    if ($confirmation -eq [System.Windows.Forms.DialogResult]::Yes) {
+        try {
+            # Delete the JSON file
+            Remove-Item -Path $jsonPath -Force
+            [System.Windows.Forms.MessageBox]::Show("Configuration was Reset Programm will now Restart.", "Success", "OK", "Information")
+
+            Restart-Executable
+        } catch {
+            [System.Windows.Forms.MessageBox]::Show("Error deleting configuration file.", "Error", "OK", "Error")
+        }
+    }
+})
+
+$uninstallButton.Add_Click({
+    $uninstallerPath = "C:\Program Files (x86)\NetCon\Uninstall.exe"
+    try {
+        # Start the uninstaller
+        Start-Process -FilePath $uninstallerPath -ArgumentList "/silent"
+        $form.Close()
+        Exit
+        [System.Windows.Forms.MessageBox]::Show("Uninstallation started.", "Uninstall", "OK", "Information")
+    } catch {
+        [System.Windows.Forms.MessageBox]::Show("Error starting uninstaller.", "Error", "OK", "Error")
+    }
+})
+
 $saveButtonIP1.Add_Click({ Save-IPConfig "1" })
 $saveButtonIP2.Add_Click({ Save-IPConfig "2" })
 $saveButtonIP3.Add_Click({ Save-IPConfig "3" })
@@ -444,5 +473,13 @@ $buttonIP1.Add_Click({ set-IPConfig "1" })
 $buttonIP2.Add_Click({ set-IPConfig "2" })
 $buttonIP3.Add_Click({ set-IPConfig "3" })
 $buttonIP4.Add_Click({ set-IPConfig "4" })
+
+Update-IPLabels
+
+# Handle Form Closing to release mutex
+$form.Add_FormClosing({
+    $mutex.ReleaseMutex() | Out-Null
+    $mutex.Dispose()
+})
 
 $form.ShowDialog() | Out-Null

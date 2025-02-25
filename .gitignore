@@ -2,3 +2,39 @@
 *.pfx
 *.cer
 Temp.txt
+
+
+
+
+
+function New-Button {
+    param (
+        [string]$Text,
+        [System.Drawing.Point]$Location,
+        [int]$Width = 100,
+        [int]$Height = 30,
+        [scriptblock]$OnClick = $null,
+        [System.Drawing.Font]$Font = $null
+    )
+
+    if ($Font) {
+        $label.Font = $Font
+    }
+
+    $button = New-Object System.Windows.Forms.Button
+    $button.Text = $Text
+    $button.Location = $Location
+    $button.Width = $Width
+    $button.Height = $Height
+
+
+
+    if ($OnClick) {
+        $button.Add_Click($OnClick)
+    }
+
+    # Add the Button to the form
+    $form.Controls.Add($button)
+
+    return $button
+}

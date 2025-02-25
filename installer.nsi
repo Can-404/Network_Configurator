@@ -32,7 +32,9 @@ Section "MainSection"
     WriteUninstaller "$INSTDIR\Uninstall.exe"
 
     ; Create a desktop shortcut
-    CreateShortCut "$DESKTOP\NetCon.lnk" "$INSTDIR\NetCon.exe" "" "$INSTDIR\Icon.ico" 0
+    CreateShortCut "$DESKTOP\NetCon.lnk" "$INSTDIR\NetCon.exe" "" "$INSTDIR\Icon.ico" 0 ""
+
+
 
     ; Add registry entries for "Apps & features"
     WriteRegStr HKLM "${UninstallRegKey}" "DisplayName" "${AppName}"
@@ -52,6 +54,10 @@ Section "Install Certificate"
 SectionEnd
 
 Section "Uninstall"
+
+    ; Close Programm
+    ExecWait 'taskkill /F /IM "$INSTDIR\NetCon.exe"'
+
     ; Remove application files
     Delete "$INSTDIR\NetCon.exe"
     Delete "$INSTDIR\README.md"
@@ -77,9 +83,10 @@ Section "Uninstall"
     Goto SkipConfigDelete
 
     DeleteConfig:
+
         Delete "$APPDATA\NetCon\UserData.json"
         RMDir "$APPDATA\NetCon"
-
+        
     SkipConfigDelete:
 
     ; Remove directory if empty
